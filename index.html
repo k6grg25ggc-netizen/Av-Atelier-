@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>AV Atelier Team</title>
+<style>
+:root{--accent:#7c3aed;--ink:#111827;--muted:#6b7280;--bg:#f5f7fb;--card:#fff;--line:#e5e7eb}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+header{background:linear-gradient(135deg,#111827,#312e81);color:#fff;padding:28px 18px 22px;border-radius:0 0 28px 28px}
+header .top{display:flex;justify-content:space-between;align-items:center;gap:12px}h1{font-size:27px;margin:0}h2{font-size:19px;margin:0 0 12px}.eyebrow{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;opacity:.7}.sub{opacity:.8;margin-top:5px;font-size:13px}
+main{max-width:850px;margin:auto;padding:16px}.tabs{display:flex;gap:8px;overflow:auto;margin-bottom:16px}.tab,button{border:0;border-radius:13px;padding:11px 14px;font-weight:700;cursor:pointer}.tab{background:#e9eaf0;color:#4b5563;white-space:nowrap}.tab.active{background:var(--accent);color:#fff}button.primary{background:var(--accent);color:#fff}button.secondary{background:#eef0f5;color:#374151}button.danger{background:#fee2e2;color:#991b1b}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.card{background:var(--card);border:1px solid var(--line);border-radius:19px;padding:15px;box-shadow:0 5px 18px #1118270a;margin-bottom:12px}.stat{font-size:28px;font-weight:800}.muted{color:var(--muted);font-size:13px}.pill{display:inline-block;padding:5px 9px;border-radius:99px;font-size:11px;font-weight:800;background:#ede9fe;color:#5b21b6}.item{border:1px solid var(--line);border-radius:15px;padding:13px;margin:10px 0;background:#fff}.itemhead{display:flex;justify-content:space-between;gap:8px}.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.actions button{font-size:12px;padding:8px 10px}.empty{text-align:center;padding:28px;color:var(--muted)}label{display:block;font-size:12px;font-weight:800;margin:11px 0 5px}input,select,textarea{width:100%;padding:11px;border:1px solid #d1d5db;border-radius:11px;font:inherit;background:#fff}textarea{min-height:90px;resize:vertical}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.modal{position:fixed;inset:0;background:#11182799;display:none;align-items:flex-end;justify-content:center;padding:12px;z-index:4}.modal.open{display:flex}.sheet{background:#fff;border-radius:24px 24px 12px 12px;padding:20px;width:min(700px,100%);max-height:92vh;overflow:auto}.member{display:flex;align-items:center;gap:10px}.avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;background:var(--accent)}.notice{background:#fffbeb;border:1px solid #fde68a;padding:12px;border-radius:14px;color:#92400e;font-size:12px;margin-bottom:12px}
+@media(min-width:700px){.modal{align-items:center}.sheet{border-radius:24px}}
+</style>
+</head>
+<body>
+<header><div class="top"><div><div class="eyebrow">AV Atelier · Team Edition</div><h1 id="teamTitle">AV Support Team</h1><div class="sub">Shared workspace for notes, gear issues, announcements and event checklists.</div></div><button class="secondary" onclick="openTeam()">Team</button></div></header>
+<main>
+<div class="notice">Prototype mode: this version stores team information in this browser. True multi-person live syncing requires connecting a shared database such as Supabase or Firebase.</div>
+<div class="tabs">
+<button class="tab active" data-tab="dashboard">Overview</button><button class="tab" data-tab="notes">Work Notes</button><button class="tab" data-tab="issues">Gear Issues</button><button class="tab" data-tab="messages">Announcements</button><button class="tab" data-tab="checklists">Checklists</button>
+</div>
+<section id="dashboard"></section><section id="notes" hidden></section><section id="issues" hidden></section><section id="messages" hidden></section><section id="checklists" hidden></section>
+</main>
+<div class="modal" id="modal"><div class="sheet"><div class="top"><h2 id="modalTitle">Add</h2><button class="secondary" onclick="closeModal()">Close</button></div><form id="form"></form></div></div>
+<script>
+const KEY='av_atelier_team_v1';
+let state=JSON.parse(localStorage.getItem(KEY)||'null')||{team:'AV Support Team',members:[{name:'You',color:'#7c3aed'}],notes:[],issues:[],messages:[],checklists:[]};
+const $=id=>document.getElementById(id), save=()=>localStorage.setItem(KEY,JSON.stringify(state));
+function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function date(){return new Date().toLocaleString()}
+function shell(title,desc,button,fn){return `<div class="top"><div><h2>${title}</h2><div class="muted">${desc}</div></div><button class="primary" onclick="${fn}">${button}</button></div>`}
+function item(x,kind){return `<div class="item"><div class="itemhead"><strong>${esc(x.title||x.text||x.name)}</strong><span class="pill">${esc(x.author||'Team')}</span></div>${x.detail?`<p>${esc(x.detail)}</p>`:''}${x.photo?`<img src="${x.photo}" alt="Attached note photo" style="max-width:100%;border-radius:14px;margin-top:8px">`:''}${x.status?`<div class="muted">Status: ${esc(x.status)}</div>`:''}${x.date?`<div class="muted">${esc(x.date)}</div>`:''}<div class="actions"><button class="primary" onclick="shareItem('${kind}','${x.id}')">Share</button><button class="secondary" onclick="editItem('${kind}','${x.id}')">Edit</button><button class="danger" onclick="removeItem('${kind}','${x.id}')">Delete</button></div></div>`}
+function render(){
+$('teamTitle').textContent=state.team;
+$('dashboard').innerHTML=`${shell('Team overview','Your shared workspace at a glance','Add note',"openForm('notes')")}<div class="grid"><div class="card"><div class="stat">${state.notes.length}</div><div class="muted">Work notes</div></div><div class="card"><div class="stat">${state.issues.length}</div><div class="muted">Gear issues</div></div><div class="card"><div class="stat">${state.messages.length}</div><div class="muted">Announcements</div></div><div class="card"><div class="stat">${state.checklists.length}</div><div class="muted">Checklists</div></div></div><div class="card"><h2>Recent team activity</h2>${[...state.notes,...state.issues,...state.messages].sort((a,b)=>b.id-a.id).slice(0,4).map(x=>item(x,'notes')).join('')||'<div class="empty">No activity yet. Add the first team update.</div>'}</div>`;
+$('notes').innerHTML=`${shell('Daily work notes','Keep everyone updated on completed work, handoffs and discoveries.','New note',"openForm('notes')")}${state.notes.map(x=>item(x,'notes')).join('')||'<div class="empty">No work notes yet.</div>'}`;
+$('issues').innerHTML=`${shell('Equipment issues','Track troubleshooting, symptoms, ownership and resolution.','New issue',"openForm('issues')")}${state.issues.map(x=>item(x,'issues')).join('')||'<div class="empty">No equipment issues yet.</div>'}`;
+$('messages').innerHTML=`${shell('Announcements','Share important updates with the whole crew.','New announcement',"openForm('messages')")}${state.messages.map(x=>item(x,'messages')).join('')||'<div class="empty">No announcements yet.</div>'}`;
+$('checklists').innerHTML=`${shell('Event checklists','Create repeatable setup and teardown checklists.','New checklist',"openForm('checklists')")}${state.checklists.map(x=>item(x,'checklists')).join('')||'<div class="empty">No checklists yet.</div>'}`;
+}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');['dashboard','notes','issues','messages','checklists'].forEach(id=>$(id).hidden=id!==b.dataset.tab)});
+function openTeam(){openForm('team')}
+function openForm(kind,obj={}){
+$('modalTitle').textContent=obj.id?'Edit item':kind==='team'?'Team settings':'Add '+kind;
+let fields='';
+if(kind==='team')fields=`<label>Team name<input name="team" value="${esc(state.team)}" required></label><label>Your display name<input name="member" value="${esc(state.members[0]?.name||'You')}" required></label>`;
+else fields=`<label>Title<input name="title" value="${esc(obj.title||'')}" required placeholder="e.g. Projector issue at Ballroom A"></label><label>Details / notes<textarea name="detail" placeholder="Add useful context for the team...">${esc(obj.detail||'')}</textarea>${kind==='notes'?`<label>Photo<input name="photo" type="file" accept="image/*" capture="environment"></label>${obj.photo?`<div class="muted">A photo is already attached. Selecting a new one will replace it.</div><img src="${obj.photo}" style="max-width:100%;border-radius:14px;margin-top:8px">`:''}`:''}<div class="row"><div><label>Author<input name="author" value="${esc(obj.author||state.members[0]?.name||'You')}" required></label></div><div><label>Status<select name="status"><option ${obj.status==='Open'?'selected':''}>Open</option><option ${obj.status==='In progress'?'selected':''}>In progress</option><option ${obj.status==='Resolved'?'selected':''}>Resolved</option><option ${obj.status==='Ready'?'selected':''}>Ready</option></select></div></div>`;
+if(kind==='checklists')fields+=`<label>Checklist items<textarea name="items" placeholder="One item per line">${esc(obj.items||'Power on\\nCheck signal\\nLabel cables\\nPhotograph final setup')}</textarea></label>`;
+fields+=`<div class="actions"><button class="primary" type="submit">Save</button><button class="secondary" type="button" onclick="closeModal()">Cancel</button></div>`;
+$('form').innerHTML=fields;$('form').onsubmit=e=>{e.preventDefault();let f=new FormData(e.target);if(kind==='team'){state.team=f.get('team');state.members=[{name:f.get('member'),color:'#7c3aed'}]}else{let x={id:obj.id||Date.now(),title:f.get('title'),detail:f.get('detail'),author:f.get('author'),status:f.get('status'),date:date()};if(kind==='checklists')x.items=f.get('items');let photo=f.get('photo');let finish=()=>{if(kind==='notes' && photo && photo.size){let reader=new FileReader();reader.onload=()=>{x.photo=reader.result;commit(x)};reader.readAsDataURL(photo)}else{if(kind==='notes')x.photo=obj.photo||'';commit(x)}};let commit=(x)=>{let arr=state[kind];let i=arr.findIndex(a=>a.id==x.id);i>=0?arr[i]=x:arr.unshift(x);save();closeModal();render()};finish()}save();closeModal();render()};
+$('modal').classList.add('open');
+}
+function editItem(kind,id){let x=state[kind].find(x=>x.id==id);openForm(kind,x)}
+function removeItem(kind,id){if(confirm('Delete this item?')){state[kind]=state[kind].filter(x=>x.id!=id);save();render()}}
+async function shareItem(kind,id){
+  const x=state[kind].find(a=>a.id==id); if(!x)return;
+  const label=kind==='notes'?'Daily Work Note':kind==='issues'?'Equipment Issue':kind==='messages'?'Team Announcement':'Event Checklist';
+  const text=`📣 ${label}\n\n${x.title||''}\n\n${x.detail||''}${x.status?`\n\nStatus: ${x.status}`:''}${x.items?`\n\nChecklist:\n${x.items}`:''}\n\n— Shared from AV Atelier by ${x.author||'Team'}\n${x.date||''}`;
+  if(navigator.share){
+    try{
+      await navigator.share({title:`${label}: ${x.title||''}`,text});
+      return;
+    }catch(err){if(err && err.name==='AbortError')return;}
+  }
+  try{
+    await navigator.clipboard.writeText(text);
+    alert('Fancy note text copied. Open Messages, choose your contact, and paste it.');
+  }catch(err){
+    const area=document.createElement('textarea');area.value=text;document.body.appendChild(area);area.select();document.execCommand('copy');area.remove();
+    alert('Note text copied. Open Messages and paste it.');
+  }
+}
+function closeModal(){$('modal').classList.remove('open')}
+render();
+</script>
+</body>
+</html>
